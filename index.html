@@ -557,79 +557,24 @@
                 statsDashboard.innerHTML = `<h3 class="text-lg font-bold text-slate-800 mb-4 pb-4 border-b border-slate-200">Resumo do Processamento</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Validade dos Números</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Válidos</span><span class="text-2xl font-bold text-green-600">${validos}</span></div><div class="flex items-center justify-between mt-1"><span class="text-red-600 font-bold">Inválidos</span><span class="text-2xl font-bold text-red-600">${total - validos}</span></div></div><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Presença no WhatsApp</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Com WhatsApp</span><span class="text-2xl font-bold text-green-600">${comWhatsApp}</span></div><div class="flex items-center justify-between mt-1"><span class="text-slate-600 font-bold">Sem WhatsApp</span><span class="text-2xl font-bold text-slate-600">${total - comWhatsApp}</span></div></div></div><div><h4 class="font-semibold text-slate-600 mb-3">Distribuição por Operadora</h4><div class="space-y-4">${operadorasHTML}</div></div>`;
             }
 
-            async function fazerProcessamentoEmLotes() {
-                const selectedKey = apiKeys.find(k => k.id == selectedKeyId);
-                if (!selectedKey) { alert('Por favor, selecione ou adicione uma chave API em "Gerenciar".'); return; }
-                if (numeros.length === 0) { alert('Nenhum número válido para processar.'); return; }
-
-                const apiKey = selectedKey.value;
-                const TAMANHO_DO_LOTE = 45;
-                const DELAY_ENTRE_LOTES = 1500;
-                const totalDeNumeros = numeros.length;
-                let numerosProcessados = 0;
-                resultadosFinais = [];
-
-                processButton.disabled = true;
-                resultsTableBody.innerHTML = '';
-                statsDashboard.innerHTML = '';
-                progressBarContainer.classList.remove('hidden');
-                progressBar.style.width = '0%';
-                statusLog.textContent = '';
-
-                for (let i = 0; i < totalDeNumeros; i += TAMANHO_DO_LOTE) {
-                    const lote = numeros.slice(i, i + TAMANHO_DO_LOTE);
-                    const loteAtual = (i / TAMANHO_DO_LOTE) + 1;
-                    const totalDeLotes = Math.ceil(totalDeNumeros / TAMANHO_DO_LOTE);
-                    processButton.textContent = `Processando Lote ${loteAtual} de ${totalDeLotes}...`;
-                    statusLog.textContent = '';
-                    try {
-                        const url = `/api/verificar?chave=${apiKey}`;
-                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lote) });
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            console.error(`ERRO HTTP no lote ${loteAtual}. Status: ${response.status}`, errorText);
-                            statusLog.textContent = `Erro no lote ${loteAtual} (Status: ${response.status}). Continuando...`;
-                            numerosProcessados += lote.length; continue;
-                        }
-                        const data = await response.json();
-                        console.log(`Resposta do Lote ${loteAtual}:`, data);
-                        if (data && data.Telefones) {
-                            resultadosFinais.push(...data.Telefones);
-                            renderizarLoteDeResultados(data.Telefones);
-                        } else {
-                            console.warn(`Lote ${loteAtual} processado, mas sem resultados na resposta.`, data.Resultado);
-                            statusLog.textContent = `Aviso no lote ${loteAtual}: ${data.Resultado?.Mensagem || 'Resposta vazia'}`;
-                        }
-                    } catch (error) {
-                        console.error(`FALHA DE REDE no lote ${loteAtual}:`, error);
-                        statusLog.textContent = `Falha de rede no lote ${loteAtual}. Verifique a conexão.`;
-                    }
-                    numerosProcessados += lote.length;
-                    const progresso = Math.round((numerosProcessados / totalDeNumeros) * 100);
-                    progressBar.style.width = `${progresso}%`;
-                    if (i + TAMANHO_DO_LOTE < totalDeNumeros) {
-                        await new Promise(resolve => setTimeout(resolve, DELAY_ENTRE_LOTES));
-                    }
-                }
-
-                processButton.textContent = 'Verificação Concluída';
-                statusLog.textContent = `Processo finalizado. ${resultadosFinais.length} de ${totalDeNumeros} números validados com sucesso.`;
-                calcularEExibirEstatisticas(resultadosFinais);
-
-                if (resultadosFinais.length > 0) {
-                    addToHistory({
-                        id: Date.now(),
-                        inputCount: totalDeNumeros,
-                        outputCount: resultadosFinais.length,
-                        results: resultadosFinais
+            async function fazerProcessamentoEmLotes(lote, apiKey) {
+                try {
+                    const resposta = await fetch(`/api/verificar?chave=${apiKey}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(lote) // Enviamos el array de números
                     });
-                }
 
-                setTimeout(() => {
-                    processButton.disabled = false;
-                    processButton.textContent = 'Verificar Números';
-                    updateInfo();
-                }, 3000);
+                    if (!resposta.ok) {
+                        throw new Error(`Erro HTTP no lote. Status: ${resposta.status}`);
+                    }
+
+                    const dados = await resposta.json();
+                    return dados;
+                } catch (error) {
+                    console.error("Erro ao processar lote:", error);
+                    throw error;
+                }
             }
 
             textInput.addEventListener('input', (e) => { parseNumbers(e.target.value); fileNameDisplay.classList.add('hidden'); });

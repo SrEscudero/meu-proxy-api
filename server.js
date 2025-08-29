@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Rota principal da nossa API proxy
+// Rota principal da nossa API proxy (POST)
 app.post('/api/verificar', async (req, res) => {
     const apiKey = req.query.chave;
     const numeros = req.body;
