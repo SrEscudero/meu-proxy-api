@@ -279,6 +279,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // All your existing element variables are correct...
             const apiKeySelector = document.getElementById('apiKeySelector');
             const manageKeysButton = document.getElementById('manageKeysButton');
             const keysModal = document.getElementById('keysModal');
@@ -317,6 +318,7 @@
             let resultadosFinais = [];
             const custoPorNumero = 0.0001;
 
+            // All your other functions (saveKeysToStorage, loadKeysFromStorage, etc.) are correct...
             function saveKeysToStorage() {
                 localStorage.setItem('api_keys', JSON.stringify(apiKeys));
                 localStorage.setItem('selected_api_key_id', selectedKeyId);
@@ -557,40 +559,89 @@
                 statsDashboard.innerHTML = `<h3 class="text-lg font-bold text-slate-800 mb-4 pb-4 border-b border-slate-200">Resumo do Processamento</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Validade dos Números</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Válidos</span><span class="text-2xl font-bold text-green-600">${validos}</span></div><div class="flex items-center justify-between mt-1"><span class="text-red-600 font-bold">Inválidos</span><span class="text-2xl font-bold text-red-600">${total - validos}</span></div></div><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Presença no WhatsApp</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Com WhatsApp</span><span class="text-2xl font-bold text-green-600">${comWhatsApp}</span></div><div class="flex items-center justify-between mt-1"><span class="text-slate-600 font-bold">Sem WhatsApp</span><span class="text-2xl font-bold text-slate-600">${total - comWhatsApp}</span></div></div></div><div><h4 class="font-semibold text-slate-600 mb-3">Distribuição por Operadora</h4><div class="space-y-4">${operadorasHTML}</div></div>`;
             }
 
-            async function fazerProcessamentoEmLotes(lote) {
-                try {
-                    // Obtém o ID selecionado no <select>
-                    const selectedKeyId = document.getElementById('apiKeySelector').value;
+            // This is the function that makes the API call for a single batch
+            async function fazerProcessamentoDeLoteUnico(lote) {
+                const selectedKeyId = apiKeySelector.value;
+                const selectedKey = apiKeys.find(key => key.id == selectedKeyId);
 
-                    // Recupera todas as chaves do localStorage
-                    const apiKeys = JSON.parse(localStorage.getItem('api_keys')) || [];
-
-                    // Busca a chave selecionada
-                    const selectedKey = apiKeys.find(key => key.id == selectedKeyId);
-
-                    if (!selectedKey) {
-                        alert("Selecione uma chave API primeiro!");
-                        throw new Error("API Key não encontrada");
-                    }
-
-                    // Faz a chamada POST com a chave real
-                    const resposta = await fetch(`/api/verificar?chave=${selectedKey.value}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(lote) // Envia o array de números
-                    });
-
-                    if (!resposta.ok) {
-                        throw new Error(`Erro HTTP no lote. Status: ${resposta.status}`);
-                    }
-
-                    const dados = await resposta.json();
-                    return dados;
-                } catch (error) {
-                    console.error("Erro ao processar lote:", error);
-                    throw error;
+                if (!selectedKey) {
+                    alert("Selecione uma chave API primeiro!");
+                    throw new Error("API Key não encontrada");
                 }
+                
+                const url = `/api/verificar?chave=${selectedKey.value}`;
+                
+                const resposta = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(lote)
+                });
+
+                if (!resposta.ok) {
+                    const errorData = await resposta.text();
+                    console.error("ERRO HTTP no lote " + lote[0] + ". Status: " + resposta.status, errorData);
+                    throw new Error(`Erro HTTP no lote. Status: ${resposta.status}`);
+                }
+
+                return await resposta.json();
             }
+
+            // ===================================================================
+            // NEW FUNCTION: This is the main function called by the button click
+            // ===================================================================
+            async function iniciarProcessamento() {
+                processButton.disabled = true;
+                processButton.innerHTML = 'Processando...';
+                progressBarContainer.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                resultsTableBody.innerHTML = '';
+                statsDashboard.innerHTML = '';
+                resultadosFinais = [];
+                
+                const tamanhoDoLote = 500; // Process 500 numbers at a time
+                const totalDeNumeros = numeros.length;
+                let numerosProcessados = 0;
+
+                for (let i = 0; i < totalDeNumeros; i += tamanhoDoLote) {
+                    const lote = numeros.slice(i, i + tamanhoDoLote);
+                    try {
+                        const resultadoDoLote = await fazerProcessamentoDeLoteUnico(lote);
+                        if(Array.isArray(resultadoDoLote.Telefone)){
+                             resultadosFinais.push(...resultadoDoLote.Telefone);
+                             renderizarLoteDeResultados(resultadoDoLote.Telefone);
+                        }
+                       
+                    } catch (error) {
+                        statusLog.textContent = `Erro em um lote: ${error.message}`;
+                        // Stop processing if one batch fails
+                        break; 
+                    }
+                    
+                    numerosProcessados += lote.length;
+                    const progresso = (numerosProcessados / totalDeNumeros) * 100;
+                    progressBar.style.width = `${progresso}%`;
+                    statusLog.textContent = `Processado ${numerosProcessados} de ${totalDeNumeros} números...`;
+                }
+
+                statusLog.textContent = `Processo finalizado. ${resultadosFinais.length} de ${totalDeNumeros} números validados com sucesso.`;
+                calcularEExibirEstatisticas(resultadosFinais);
+                
+                if (resultadosFinais.length > 0) {
+                     const runData = {
+                        id: Date.now(),
+                        inputCount: totalDeNumeros,
+                        outputCount: resultadosFinais.length,
+                        results: resultadosFinais
+                    };
+                    addToHistory(runData);
+                }
+
+                processButton.disabled = false;
+                processButton.innerHTML = 'Verificar Números';
+            }
+            
+            // Your old 'fazerProcessamentoEmLotes' function has been renamed to 'fazerProcessamentoDeLoteUnico'
+            // and is now called inside the new main function.
 
             textInput.addEventListener('input', (e) => { parseNumbers(e.target.value); fileNameDisplay.classList.add('hidden'); });
             dropzone.addEventListener('click', () => fileInput.click());
@@ -598,7 +649,12 @@
             dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-blue-500', 'bg-blue-50'); });
             dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-500', 'bg-blue-50'));
             dropzone.addEventListener('drop', (e) => { e.preventDefault(); dropzone.classList.remove('border-blue-500', 'bg-blue-50'); handleFile(e.dataTransfer.files[0]); });
-            processButton.addEventListener('click', fazerProcessamentoEmLotes);
+            
+            // ===================================================================
+            // CHANGED LINE: The button now calls the new main function
+            // ===================================================================
+            processButton.addEventListener('click', iniciarProcessamento);
+
             exportButton.addEventListener('click', () => { if (resultadosFinais.length === 0) { alert('Nenhum resultado para exportar.'); return; } const worksheet = XLSX.utils.json_to_sheet(resultadosFinais); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados"); XLSX.writeFile(workbook, "Relatorio_HLR_Completo.xlsx"); });
             updateInfo();
         });
