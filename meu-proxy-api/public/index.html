@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Verificação HLR</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-100 text-slate-800">
+
+    <div id="keysModal"
+        class="hidden modal fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg animate-fade-in">
+            <div class="flex justify-between items-center p-4 border-b border-slate-200">
+                <h3 class="text-lg font-bold text-slate-800">Gerenciar Chaves API</h3>
+                <button id="closeModalButton" class="text-slate-500 hover:text-slate-800 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="keyListContainer" class="p-6 max-h-60 overflow-y-auto space-y-3"></div>
+            <div class="p-6 bg-slate-50 border-t border-slate-200 rounded-b-xl">
+                <h4 class="font-semibold text-slate-700 mb-3">Adicionar Nova Chave</h4>
+                <div class="space-y-4">
+                    <input id="newKeyName" type="text" placeholder="Nome da Chave (ex: Pessoal)"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <input id="newKeyValue" type="text" placeholder="Cole a chave API aqui"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <button id="addKeyButton"
+                        class="w-full bg-blue-600 text-white font-bold py-2.5 px-4 rounded-lg hover:bg-blue-700 transition-colors">Salvar
+                        Nova Chave</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="historyModal"
+        class="hidden modal fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl animate-fade-in">
+            <div class="flex justify-between items-center p-4 border-b border-slate-200">
+                <h3 class="text-lg font-bold text-slate-800">Histórico de Processamentos</h3>
+                <button id="closeHistoryModalButton" class="text-slate-500 hover:text-slate-800 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="historyListContainer" class="p-6 max-h-96 overflow-y-auto space-y-3"></div>
+        </div>
+    </div>
+
+    <div id="docsPanel"
+        class="fixed top-0 right-0 h-full bg-white shadow-2xl z-50 transform translate-x-full transition-transform duration-300 ease-in-out w-full max-w-md p-6 overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-slate-900">Documentação da API</h2>
+            <button id="closeDocsButton" class="text-slate-500 hover:text-slate-800 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+        <div class="space-y-8 text-sm">
+            <div>
+                <h3 class="font-semibold text-lg text-slate-800">Consulta em Lote (POST)</h3>
+                <p class="text-slate-600 mt-1">Permite consultar vários números simultaneamente.</p>
+                <code
+                    class="block bg-slate-100 text-slate-700 p-3 rounded-md mt-2 text-xs break-words">https://sms.witi.me/izdata/hlr.aspx?chave=SUA_CHAVE_API</code>
+                <h4 class="font-medium mt-4 mb-2">Estrutura de Entrada (Body)</h4>
+                <p class="text-slate-600 mt-1">Uma lista (JSON Array) de números de telefone em formato de string.</p>
+                <pre
+                    class="bg-slate-800 text-white p-3 rounded-md mt-2 text-xs"><code>["54992389592", "11987654321", ...]</code></pre>
+            </div>
+            <div>
+                <h3 class="font-semibold text-lg text-slate-800">Estrutura da Resposta (JSON)</h3>
+                <p class="text-slate-600 mt-1">A resposta contém uma lista de telefones e o resultado da consulta.</p>
+                <h4 class="font-medium mt-4 mb-2">Campos do Objeto "Telefone"</h4>
+                <div class="overflow-hidden border border-slate-200 rounded-lg">
+                    <table class="min-w-full text-left">
+                        <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-600 uppercase">
+                            <tr>
+                                <th class="p-3">Propriedade</th>
+                                <th class="p-3">Descrição</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-200">
+                            <tr>
+                                <td class="p-3 font-mono">Valido</td>
+                                <td class="p-3 text-slate-600">Indica se o telefone é válido (true/false).</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-mono">Operadora</td>
+                                <td class="p-3 text-slate-600">Nome da operadora.</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-mono">WhatsApp</td>
+                                <td class="p-3 text-slate-600">Indica se há um WhatsApp registrado (true/false).</td>
+                            </tr>
+                            <tr class="bg-blue-50/50">
+                                <td class="p-3 font-mono font-semibold">DataConsulta</td>
+                                <td class="p-3 text-slate-600"><span class="font-bold">A data da última
+                                        atualização</span> da informação no banco de dados da API (cache), e não a data
+                                    em que você fez a sua consulta.</td>
+                            </tr>
+                            <tr class="bg-blue-50/50">
+                                <td class="p-3 font-mono font-semibold">WhatsAppDataStatus</td>
+                                <td class="p-3 text-slate-600">A <span class="font-bold">data do status</span> retornado
+                                    no campo `WhatsApp`. O valor "0001-01-01" é um valor nulo.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="overlay"
+        class="fixed inset-0 bg-black bg-opacity-60 z-40 transition-opacity duration-300 hidden opacity-0"></div>
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-30 border-b border-slate-200">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M12 6V4m0 16v-2M12 12l-2-2m2 2l2-2m2 2l-2 2m-2-2l-2 2" />
+                </svg>
+                <h1 class="text-2xl font-bold text-slate-900">Verificador HLR</h1>
+            </div>
+            <div class="flex items-center gap-6">
+                <button id="historyButton"
+                    class="text-blue-600 hover:text-blue-800 font-semibold transition-colors text-sm">Histórico</button>
+                <button id="openDocsButton"
+                    class="text-blue-600 hover:text-blue-800 font-semibold transition-colors text-sm">Documentação</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-6 py-10">
+        <div class="max-w-3xl mx-auto grid grid-cols-1 gap-8">
+            <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+                <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-3">
+                    <span
+                        class="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">1</span>
+                    Selecione a API Key
+                </h3>
+                <div class="flex items-center gap-3">
+                    <select id="apiKeySelector"
+                        class="w-full p-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 transition"></select>
+                    <button id="manageKeysButton"
+                        class="flex-shrink-0 bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold py-2.5 px-4 rounded-lg transition-colors">
+                        Gerenciar
+                    </button>
+                </div>
+                <p class="text-xs text-slate-500 mt-2">Selecione uma chave para usar ou adicione uma nova em
+                    "Gerenciar".</p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+                <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-3">
+                    <span
+                        class="bg-blue-600 text-white w-7 h-7 rounded-full flex items-center justify-center font-bold text-sm">2</span>
+                    Insira os Números
+                </h3>
+                <div id="dropzone"
+                    class="mt-2 flex flex-col justify-center items-center w-full p-6 border-2 border-dashed rounded-xl cursor-pointer transition-colors border-slate-300 bg-white hover:bg-slate-50">
+                    <input id="fileInput" type="file" class="hidden" accept=".txt,.csv,.xlsx" />
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mb-3 text-slate-400" fill="none"
+                        viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="text-sm text-slate-500"><span class="font-semibold text-blue-600">Clique para
+                            selecionar</span> ou arraste e solte</p>
+                    <p class="text-xs text-slate-400 mt-1">.TXT, .CSV ou .XLSX</p>
+                </div>
+                <div class="text-center my-4 text-slate-500 font-semibold text-sm">ou</div>
+                <textarea id="textInput" placeholder="Cole uma lista de números aqui (um por linha)..."
+                    class="w-full h-40 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"></textarea>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md border border-slate-200">
+                <div
+                    class="bg-slate-100 p-4 rounded-lg mb-6 flex justify-between items-center flex-wrap gap-4 border border-slate-200">
+                    <div>
+                        <p class="font-medium text-slate-600">Números para Enviar: <span id="count"
+                                class="text-xl font-bold text-slate-900">0</span></p>
+                        <p class="font-medium text-slate-600">Custo Estimado: <span id="cost"
+                                class="text-xl font-bold text-slate-900">R$ 0,0000</span></p>
+                    </div>
+                    <div id="fileNameDisplay"
+                        class="hidden items-center gap-2 bg-white p-2 rounded-lg border border-slate-200"></div>
+                </div>
+                <button id="processButton"
+                    class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-slate-400 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all duration-300 transform hover:scale-105">
+                    Verificar Números
+                </button>
+                <div id="progressBarContainer" class="mt-4 w-full bg-slate-200 rounded-full h-2.5 hidden">
+                    <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full transition-all duration-500"
+                        style="width: 0%;"></div>
+                </div>
+                <div id="statusLog" class="mt-4 text-sm text-center text-slate-600 h-5"></div>
+            </div>
+
+            <div id="resultsContainer"
+                class="hidden bg-white p-6 rounded-xl shadow-md border border-slate-200 animate-fade-in">
+                <div id="statsDashboard" class="mb-6"></div>
+                <div class="flex justify-between items-center mb-4 pb-4 border-b border-slate-200">
+                    <h3 class="text-lg font-bold text-slate-800">Resultados Detalhados</h3>
+                    <button id="exportButton"
+                        class="bg-green-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-green-700 flex items-center gap-2 transition-transform transform hover:scale-105 duration-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd"
+                                d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z"
+                                clip-rule="evenodd" />
+                        </svg>
+                        <span>Exportar</span>
+                    </button>
+                </div>
+                <div class="max-h-[500px] overflow-auto rounded-lg border border-slate-200">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50 sticky top-0">
+                            <tr>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Telefone</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Operadora</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    Válido</th>
+                                <th
+                                    class="px-6 py-3 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                                    WhatsApp</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTableBody" class="bg-white divide-y divide-slate-200"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const apiKeySelector = document.getElementById('apiKeySelector');
+            const manageKeysButton = document.getElementById('manageKeysButton');
+            const keysModal = document.getElementById('keysModal');
+            const closeModalButton = document.getElementById('closeModalButton');
+            const keyListContainer = document.getElementById('keyListContainer');
+            const newKeyName = document.getElementById('newKeyName');
+            const newKeyValue = document.getElementById('newKeyValue');
+            const addKeyButton = document.getElementById('addKeyButton');
+            const historyModal = document.getElementById('historyModal');
+            const closeHistoryModalButton = document.getElementById('closeHistoryModalButton');
+            const historyListContainer = document.getElementById('historyListContainer');
+            const historyButton = document.getElementById('historyButton');
+            const statsDashboard = document.getElementById('statsDashboard');
+            const statusLog = document.getElementById('statusLog');
+            const textInput = document.getElementById('textInput');
+            const dropzone = document.getElementById('dropzone');
+            const fileInput = document.getElementById('fileInput');
+            const fileNameDisplay = document.getElementById('fileNameDisplay');
+            const countEl = document.getElementById('count');
+            const costEl = document.getElementById('cost');
+            const processButton = document.getElementById('processButton');
+            const progressBarContainer = document.getElementById('progressBarContainer');
+            const progressBar = document.getElementById('progressBar');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const resultsTableBody = document.getElementById('resultsTableBody');
+            const exportButton = document.getElementById('exportButton');
+            const openDocsButton = document.getElementById('openDocsButton');
+            const closeDocsButton = document.getElementById('closeDocsButton');
+            const docsPanel = document.getElementById('docsPanel');
+            const overlay = document.getElementById('overlay');
+
+            let apiKeys = [];
+            let selectedKeyId = null;
+            let history = [];
+            let numeros = [];
+            let resultadosFinais = [];
+            const custoPorNumero = 0.0001;
+
+            function saveKeysToStorage() {
+                localStorage.setItem('api_keys', JSON.stringify(apiKeys));
+                localStorage.setItem('selected_api_key_id', selectedKeyId);
+            }
+
+            function loadKeysFromStorage() {
+                apiKeys = JSON.parse(localStorage.getItem('api_keys')) || [];
+                selectedKeyId = localStorage.getItem('selected_api_key_id') || (apiKeys.length > 0 ? apiKeys[0].id : null);
+            }
+
+            function renderKeySelector() {
+                apiKeySelector.innerHTML = '';
+                if (apiKeys.length === 0) {
+                    apiKeySelector.innerHTML = '<option disabled selected>Adicione uma chave em "Gerenciar"</option>';
+                } else {
+                    apiKeys.forEach(key => {
+                        const option = document.createElement('option');
+                        option.value = key.id;
+                        option.textContent = key.name;
+                        option.selected = key.id == selectedKeyId;
+                        apiKeySelector.appendChild(option);
+                    });
+                }
+                updateInfo();
+            }
+
+            function renderKeysInModal() {
+                keyListContainer.innerHTML = '';
+                if (apiKeys.length === 0) {
+                    keyListContainer.innerHTML = '<p class="text-slate-500 text-center">Você ainda não salvou nenhuma chave API.</p>';
+                } else {
+                    apiKeys.forEach(key => {
+                        const keyDiv = document.createElement('div');
+                        keyDiv.className = 'flex items-center justify-between bg-slate-100 p-3 rounded-lg';
+                        keyDiv.innerHTML = `
+                            <div>
+                                <p class="font-semibold text-slate-800">${key.name}</p>
+                                <p class="text-xs text-slate-500 font-mono">${key.value.substring(0, 4)}...${key.value.substring(key.value.length - 4)}</p>
+                            </div>
+                            <button data-key-id="${key.id}" class="delete-key-btn text-red-500 hover:text-red-700 transition-colors p-1 rounded-full">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd" /></svg>
+                            </button>
+                        `;
+                        keyListContainer.appendChild(keyDiv);
+                    });
+                }
+            }
+
+            function openModal(modal) { modal.classList.remove('hidden'); }
+            function closeModal(modal) { modal.classList.add('hidden'); }
+
+            function saveHistoryToStorage() {
+                const historyToSave = history.slice(0, 10);
+                localStorage.setItem('processing_history', JSON.stringify(historyToSave));
+            }
+
+            function loadHistoryFromStorage() {
+                history = JSON.parse(localStorage.getItem('processing_history')) || [];
+            }
+
+            function addToHistory(runData) {
+                history.unshift(runData);
+                saveHistoryToStorage();
+            }
+
+            function renderHistoryList() {
+                historyListContainer.innerHTML = '';
+                if (history.length === 0) {
+                    historyListContainer.innerHTML = '<p class="text-slate-500 text-center">Nenhum processamento salvo no histórico.</p>';
+                } else {
+                    history.forEach(run => {
+                        const historyDiv = document.createElement('div');
+                        historyDiv.className = 'flex items-center justify-between bg-slate-100 p-3 rounded-lg';
+                        historyDiv.innerHTML = `
+                            <div>
+                                <p class="font-semibold text-slate-800">${new Date(run.id).toLocaleString('pt-BR')}</p>
+                                <p class="text-xs text-slate-500">${run.inputCount} números de entrada → ${run.outputCount} resultados</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button data-history-id="${run.id}" class="view-history-btn bg-blue-100 text-blue-700 hover:bg-blue-200 text-xs font-bold py-1 px-2 rounded">Ver</button>
+                                <button data-history-id="${run.id}" class="download-history-btn bg-green-100 text-green-700 hover:bg-green-200 text-xs font-bold py-1 px-2 rounded">Baixar</button>
+                            </div>
+                        `;
+                        historyListContainer.appendChild(historyDiv);
+                    });
+                }
+            }
+
+            loadKeysFromStorage();
+            loadHistoryFromStorage();
+            renderKeySelector();
+
+            manageKeysButton.addEventListener('click', () => { renderKeysInModal(); openModal(keysModal); });
+            closeModalButton.addEventListener('click', () => closeModal(keysModal));
+            keysModal.addEventListener('click', (e) => { if (e.target === keysModal) closeModal(keysModal); });
+
+            historyButton.addEventListener('click', () => { renderHistoryList(); openModal(historyModal); });
+            closeHistoryModalButton.addEventListener('click', () => closeModal(historyModal));
+            historyModal.addEventListener('click', (e) => { if (e.target === historyModal) closeModal(historyModal); });
+
+            historyListContainer.addEventListener('click', (e) => {
+                const historyId = e.target.dataset.historyId;
+                if (!historyId) return;
+                const runData = history.find(run => run.id == historyId);
+                if (!runData) return;
+
+                if (e.target.classList.contains('view-history-btn')) {
+                    resultadosFinais = runData.results;
+                    resultsTableBody.innerHTML = '';
+                    renderizarLoteDeResultados(resultadosFinais);
+                    calcularEExibirEstatisticas(resultadosFinais);
+                    closeModal(historyModal);
+                }
+
+                if (e.target.classList.contains('download-history-btn')) {
+                    const worksheet = XLSX.utils.json_to_sheet(runData.results);
+                    const workbook = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados");
+                    XLSX.writeFile(workbook, `Relatorio_HLR_${runData.id}.xlsx`);
+                }
+            });
+
+            addKeyButton.addEventListener('click', () => {
+                const name = newKeyName.value.trim();
+                const value = newKeyValue.value.trim();
+                if (name && value) {
+                    const newKey = { id: Date.now(), name, value };
+                    apiKeys.push(newKey);
+                    selectedKeyId = newKey.id;
+                    saveKeysToStorage();
+                    renderKeySelector();
+                    renderKeysInModal();
+                    newKeyName.value = '';
+                    newKeyValue.value = '';
+                } else {
+                    alert('Por favor, preencha o nome e o valor da chave.');
+                }
+            });
+
+            keyListContainer.addEventListener('click', (e) => {
+                const deleteButton = e.target.closest('.delete-key-btn');
+                if (deleteButton) {
+                    const keyId = deleteButton.dataset.keyId;
+                    if (confirm('Tem certeza que deseja apagar esta chave?')) {
+                        apiKeys = apiKeys.filter(key => key.id != keyId);
+                        if (selectedKeyId == keyId) {
+                            selectedKeyId = apiKeys.length > 0 ? apiKeys[0].id : null;
+                        }
+                        saveKeysToStorage();
+                        renderKeySelector();
+                        renderKeysInModal();
+                    }
+                }
+            });
+
+            apiKeySelector.addEventListener('change', (e) => {
+                selectedKeyId = e.target.value;
+                saveKeysToStorage();
+                updateInfo();
+            });
+
+            openDocsButton.addEventListener('click', () => {
+                overlay.classList.remove('hidden');
+                setTimeout(() => {
+                    docsPanel.classList.remove('translate-x-full');
+                    overlay.classList.remove('opacity-0');
+                }, 10);
+            });
+            function closeDocs() {
+                docsPanel.classList.add('translate-x-full');
+                overlay.classList.add('opacity-0');
+                setTimeout(() => { overlay.classList.add('hidden'); }, 300);
+            }
+            closeDocsButton.addEventListener('click', closeDocs);
+            overlay.addEventListener('click', closeDocs);
+
+            function updateInfo() {
+                countEl.textContent = numeros.length;
+                const custoEstimado = (numeros.length * custoPorNumero).toFixed(4).replace('.', ',');
+                costEl.textContent = `R$ ${custoEstimado}`;
+                processButton.disabled = numeros.length === 0 || !selectedKeyId;
+            }
+
+            function parseNumbers(text) {
+                const parsed = text.split(/[\s,;\n]+/).map(n => n.trim().replace(/\D/g, '')).filter(n => n.length >= 10 && n.length <= 13);
+                numeros = [...new Set(parsed)];
+                updateInfo();
+            }
+
+            function handleFile(file) {
+                if (!file) return;
+                textInput.value = '';
+                fileNameDisplay.classList.remove('hidden');
+                fileNameDisplay.classList.add('flex');
+                fileNameDisplay.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-500" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" /></svg><span class="text-sm font-medium text-slate-700">${file.name}</span>`;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const content = e.target.result;
+                    if (file.name.endsWith('.xlsx')) {
+                        const workbook = XLSX.read(content, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        const numbersFromSheet = json.flat().map(String);
+                        parseNumbers(numbersFromSheet.join('\n'));
+                    } else { parseNumbers(content); }
+                };
+                if (file.name.endsWith('.xlsx')) { reader.readAsArrayBuffer(file); } else { reader.readAsText(file); }
+            }
+
+            function renderizarLoteDeResultados(loteDeResultados) {
+                if (loteDeResultados.length === 0) return;
+                resultsContainer.classList.remove('hidden');
+                let content = '';
+                loteDeResultados.forEach(res => {
+                    const validoClass = res.Valido ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                    const whatsAppClass = res.WhatsApp ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800';
+                    content += `<tr class="hover:bg-slate-50 transition-colors"><td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">${res.Telefone}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">${res.Operadora || 'N/A'}</td><td class="px-6 py-4 whitespace-nowrap text-sm"><span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${validoClass}">${res.Valido ? 'Sim' : 'Não'}</span></td><td class="px-6 py-4 whitespace-nowrap text-sm"><span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${whatsAppClass}">${res.WhatsApp ? 'Sim' : 'Não'}</span></td></tr>`;
+                });
+                resultsTableBody.innerHTML += content;
+            }
+
+            function calcularEExibirEstatisticas(resultados) {
+                if (!resultados || resultados.length === 0) return;
+                const total = resultados.length;
+                const validos = resultados.filter(r => r.Valido).length;
+                const comWhatsApp = resultados.filter(r => r.WhatsApp).length;
+                const contagemOperadoras = resultados.reduce((acc, r) => {
+                    const operadora = r.Operadora || 'Desconhecida';
+                    acc[operadora] = (acc[operadora] || 0) + 1;
+                    return acc;
+                }, {});
+                const operadorasOrdenadas = Object.entries(contagemOperadoras).sort(([, a], [, b]) => b - a);
+                let operadorasHTML = operadorasOrdenadas.map(([nome, contagem]) => {
+                    const percentual = ((contagem / total) * 100).toFixed(1);
+                    return `<div><div class="flex justify-between mb-1"><span class="text-sm font-medium text-slate-700">${nome}</span><span class="text-sm font-medium text-slate-500">${contagem} (${percentual}%)</span></div><div class="w-full bg-slate-200 rounded-full h-2.5"><div class="bg-blue-600 h-2.5 rounded-full" style="width: ${percentual}%"></div></div></div>`;
+                }).join('');
+                statsDashboard.innerHTML = `<h3 class="text-lg font-bold text-slate-800 mb-4 pb-4 border-b border-slate-200">Resumo do Processamento</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Validade dos Números</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Válidos</span><span class="text-2xl font-bold text-green-600">${validos}</span></div><div class="flex items-center justify-between mt-1"><span class="text-red-600 font-bold">Inválidos</span><span class="text-2xl font-bold text-red-600">${total - validos}</span></div></div><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Presença no WhatsApp</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Com WhatsApp</span><span class="text-2xl font-bold text-green-600">${comWhatsApp}</span></div><div class="flex items-center justify-between mt-1"><span class="text-slate-600 font-bold">Sem WhatsApp</span><span class="text-2xl font-bold text-slate-600">${total - comWhatsApp}</span></div></div></div><div><h4 class="font-semibold text-slate-600 mb-3">Distribuição por Operadora</h4><div class="space-y-4">${operadorasHTML}</div></div>`;
+            }
+
+            async function fazerProcessamentoEmLotes() {
+                const selectedKey = apiKeys.find(k => k.id == selectedKeyId);
+                if (!selectedKey) { alert('Por favor, selecione ou adicione uma chave API em "Gerenciar".'); return; }
+                if (numeros.length === 0) { alert('Nenhum número válido para processar.'); return; }
+
+                const apiKey = selectedKey.value;
+                const TAMANHO_DO_LOTE = 45;
+                const DELAY_ENTRE_LOTES = 1500;
+                const totalDeNumeros = numeros.length;
+                let numerosProcessados = 0;
+                resultadosFinais = [];
+
+                processButton.disabled = true;
+                resultsTableBody.innerHTML = '';
+                statsDashboard.innerHTML = '';
+                progressBarContainer.classList.remove('hidden');
+                progressBar.style.width = '0%';
+                statusLog.textContent = '';
+
+                for (let i = 0; i < totalDeNumeros; i += TAMANHO_DO_LOTE) {
+                    const lote = numeros.slice(i, i + TAMANHO_DO_LOTE);
+                    const loteAtual = (i / TAMANHO_DO_LOTE) + 1;
+                    const totalDeLotes = Math.ceil(totalDeNumeros / TAMANHO_DO_LOTE);
+                    processButton.textContent = `Processando Lote ${loteAtual} de ${totalDeLotes}...`;
+                    statusLog.textContent = '';
+                    try {
+                        const url = `/api/verificar?chave=${apiKey}`;
+                        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lote) });
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`ERRO HTTP no lote ${loteAtual}. Status: ${response.status}`, errorText);
+                            statusLog.textContent = `Erro no lote ${loteAtual} (Status: ${response.status}). Continuando...`;
+                            numerosProcessados += lote.length; continue;
+                        }
+                        const data = await response.json();
+                        console.log(`Resposta do Lote ${loteAtual}:`, data);
+                        if (data && data.Telefones) {
+                            resultadosFinais.push(...data.Telefones);
+                            renderizarLoteDeResultados(data.Telefones);
+                        } else {
+                            console.warn(`Lote ${loteAtual} processado, mas sem resultados na resposta.`, data.Resultado);
+                            statusLog.textContent = `Aviso no lote ${loteAtual}: ${data.Resultado?.Mensagem || 'Resposta vazia'}`;
+                        }
+                    } catch (error) {
+                        console.error(`FALHA DE REDE no lote ${loteAtual}:`, error);
+                        statusLog.textContent = `Falha de rede no lote ${loteAtual}. Verifique a conexão.`;
+                    }
+                    numerosProcessados += lote.length;
+                    const progresso = Math.round((numerosProcessados / totalDeNumeros) * 100);
+                    progressBar.style.width = `${progresso}%`;
+                    if (i + TAMANHO_DO_LOTE < totalDeNumeros) {
+                        await new Promise(resolve => setTimeout(resolve, DELAY_ENTRE_LOTES));
+                    }
+                }
+
+                processButton.textContent = 'Verificação Concluída';
+                statusLog.textContent = `Processo finalizado. ${resultadosFinais.length} de ${totalDeNumeros} números validados com sucesso.`;
+                calcularEExibirEstatisticas(resultadosFinais);
+
+                if (resultadosFinais.length > 0) {
+                    addToHistory({
+                        id: Date.now(),
+                        inputCount: totalDeNumeros,
+                        outputCount: resultadosFinais.length,
+                        results: resultadosFinais
+                    });
+                }
+
+                setTimeout(() => {
+                    processButton.disabled = false;
+                    processButton.textContent = 'Verificar Números';
+                    updateInfo();
+                }, 3000);
+            }
+
+            textInput.addEventListener('input', (e) => { parseNumbers(e.target.value); fileNameDisplay.classList.add('hidden'); });
+            dropzone.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+            dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-blue-500', 'bg-blue-50'); });
+            dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-blue-500', 'bg-blue-50'));
+            dropzone.addEventListener('drop', (e) => { e.preventDefault(); dropzone.classList.remove('border-blue-500', 'bg-blue-50'); handleFile(e.dataTransfer.files[0]); });
+            processButton.addEventListener('click', fazerProcessamentoEmLotes);
+            exportButton.addEventListener('click', () => { if (resultadosFinais.length === 0) { alert('Nenhum resultado para exportar.'); return; } const worksheet = XLSX.utils.json_to_sheet(resultadosFinais); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Resultados"); XLSX.writeFile(workbook, "Relatorio_HLR_Completo.xlsx"); });
+            updateInfo();
+        });
+    </script>
+</body>
+
+</html>
