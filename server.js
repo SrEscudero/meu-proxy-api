@@ -45,6 +45,5 @@ app.post('/api/verificar', async (req, res) => {
 });
 
 // Inicia o servidor
-app.listen(PORT, () => {
-    console.log(`🚀 Servidor proxy rodando na porta http://localhost:${PORT}`);
-});
+// Exporta a app para Vercel
+module.exports = app;
