@@ -583,7 +583,7 @@
                     processButton.textContent = `Processando Lote ${loteAtual} de ${totalDeLotes}...`;
                     statusLog.textContent = '';
                     try {
-                        const url = `http://localhost:3001/api/verificar?chave=${apiKey}`;
+                        const url = `/api/verificar?chave=${apiKey}`;
                         const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(lote) });
                         if (!response.ok) {
                             const errorText = await response.text();
