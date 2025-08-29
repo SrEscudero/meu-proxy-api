@@ -557,12 +557,27 @@
                 statsDashboard.innerHTML = `<h3 class="text-lg font-bold text-slate-800 mb-4 pb-4 border-b border-slate-200">Resumo do Processamento</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Validade dos Números</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Válidos</span><span class="text-2xl font-bold text-green-600">${validos}</span></div><div class="flex items-center justify-between mt-1"><span class="text-red-600 font-bold">Inválidos</span><span class="text-2xl font-bold text-red-600">${total - validos}</span></div></div><div class="bg-slate-50 p-4 rounded-lg border border-slate-200"><h4 class="font-semibold text-slate-600 mb-2">Presença no WhatsApp</h4><div class="flex items-center justify-between"><span class="text-green-600 font-bold">Com WhatsApp</span><span class="text-2xl font-bold text-green-600">${comWhatsApp}</span></div><div class="flex items-center justify-between mt-1"><span class="text-slate-600 font-bold">Sem WhatsApp</span><span class="text-2xl font-bold text-slate-600">${total - comWhatsApp}</span></div></div></div><div><h4 class="font-semibold text-slate-600 mb-3">Distribuição por Operadora</h4><div class="space-y-4">${operadorasHTML}</div></div>`;
             }
 
-            async function fazerProcessamentoEmLotes(lote, apiKey) {
+            async function fazerProcessamentoEmLotes(lote) {
                 try {
-                    const resposta = await fetch(`/api/verificar?chave=${apiKey}`, {
+                    // Obtém o ID selecionado no <select>
+                    const selectedKeyId = document.getElementById('apiKeySelector').value;
+
+                    // Recupera todas as chaves do localStorage
+                    const apiKeys = JSON.parse(localStorage.getItem('api_keys')) || [];
+
+                    // Busca a chave selecionada
+                    const selectedKey = apiKeys.find(key => key.id == selectedKeyId);
+
+                    if (!selectedKey) {
+                        alert("Selecione uma chave API primeiro!");
+                        throw new Error("API Key não encontrada");
+                    }
+
+                    // Faz a chamada POST com a chave real
+                    const resposta = await fetch(`/api/verificar?chave=${selectedKey.value}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(lote) // Enviamos el array de números
+                        body: JSON.stringify(lote) // Envia o array de números
                     });
 
                     if (!resposta.ok) {
